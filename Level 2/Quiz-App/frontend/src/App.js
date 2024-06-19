@@ -18,7 +18,7 @@ import ExamsPage from "./pages/admin/Exams/Exams";
 import AddEditExam from "./pages/admin/Exams/AddEditExam";
 import Loader from "./components/Loader";
 import { useSelector } from "react-redux";
-import WriteExam from "./pages/user/WriteExam/Weite_Exams";
+import WriteExam from "./pages/user/WriteExam/Write_Exams";
 import AdminReportsPage from "./pages/admin/Reports/Admin_Reports";
 import { isTokenExp } from "./Utils/jwt";
 
