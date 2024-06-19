@@ -600,8 +600,8 @@ footer .text span a:hover {
 }
 @media (max-width: 900px) {
   .about .left img {
-    height: 350px;
-    width: 350px;
+    height: 600px;
+    width: 400px;
   }
 }
 
