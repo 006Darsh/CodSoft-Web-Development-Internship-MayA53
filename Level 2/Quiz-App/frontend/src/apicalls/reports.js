@@ -9,6 +9,8 @@ export const addReport = async (payload) => {
     );
     return response.data;
   } catch (error) {
+    console.log(error.response.data);
+
     return error.response.data;
   }
 };
@@ -21,6 +23,8 @@ export const getAllAttempts = async (payload) => {
     );
     return response.data;
   } catch (error) {
+    console.log(error.response.data);
+
     return error.response.data;
   }
 };
@@ -32,6 +36,8 @@ export const getAllAttemptsByUser = async () => {
     );
     return response.data;
   } catch (error) {
+    console.log(error.response.data);
+
     return error.response.data;
   }
 };

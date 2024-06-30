@@ -1,37 +1,36 @@
-import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import React, { useState, useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { getExamById } from "../../../apicalls/exams";
 import { HideLoading, ShowLoading } from "../../../redux/loaderSlice";
 import { message } from "antd";
 import Instructions from "./Instructions";
 import { addReport } from "../../../apicalls/reports";
-import { useSelector } from "react-redux";
 
 function WriteExam() {
-  const [examData, setExamData] = useState();
+  const [examData, setExamData] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState({});
-  const [result, setResult] = useState();
+  const [result, setResult] = useState(null);
   const { id } = useParams();
   const dispatch = useDispatch();
   const [view, setView] = useState("instructions");
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [timeUp, setTimeUp] = useState(false);
-  const [intervalId, setIntervalId] = useState(null);
+  const intervalIdRef = useRef(null);
   const { user } = useSelector((state) => state.users);
   const navigate = useNavigate();
+
   const getExamDataById = async (id) => {
     try {
       dispatch(ShowLoading());
       const response = await getExamById(id);
       dispatch(HideLoading());
       if (response.success) {
-        message.success(response.message);
         setExamData(response.data);
         setQuestions(response.data.questions);
-        setSecondsLeft(response.data.duration);
+        setSecondsLeft(response.data.duration * 60); // assuming duration is in minutes
       } else {
         message.error(response.message);
       }
@@ -40,6 +39,7 @@ function WriteExam() {
       message.error(error.message);
     }
   };
+
   const calculateResult = async () => {
     try {
       let correctAnswers = [];
@@ -52,16 +52,24 @@ function WriteExam() {
           wrongAnswers.push(question);
         }
       });
+
       let verdict = "Pass";
       if (correctAnswers.length < examData.passingMarks) {
         verdict = "Fail";
       }
+
       const tempResult = {
         correctAnswers,
         wrongAnswers,
         verdict,
       };
+
       setResult(tempResult);
+      console.log(user);
+      if (!user || !user._id) {
+        throw new Error("User is not defined");
+      }
+
       dispatch(ShowLoading());
       const response = await addReport({
         exam: id,
@@ -69,39 +77,52 @@ function WriteExam() {
         user: user._id,
       });
       dispatch(HideLoading());
+
       if (response.success) {
         setView("result");
       } else {
+        console.log(response.message);
         message.error(response.message);
       }
     } catch (error) {
       dispatch(HideLoading());
+      console.log(error.message);
       message.error(error.message);
     }
   };
+
   const startTimer = () => {
-    let totalSeconds = examData.duration;
-    const intervalId = setInterval(() => {
-      if (totalSeconds > 0) {
-        totalSeconds = totalSeconds - 1;
-        setSecondsLeft(totalSeconds);
-      } else {
-        setTimeUp(true);
-      }
+    const interval = setInterval(() => {
+      setSecondsLeft((prevSeconds) => {
+        if (prevSeconds > 0) {
+          return prevSeconds - 1;
+        } else {
+          setTimeUp(true);
+          clearInterval(intervalIdRef.current);
+          return 0;
+        }
+      });
     }, 1000);
-    setIntervalId(intervalId);
+    intervalIdRef.current = interval;
   };
+
   useEffect(() => {
     if (timeUp && view === "questions") {
-      clearInterval(intervalId);
       calculateResult();
     }
   }, [timeUp]);
+
   useEffect(() => {
     if (id) {
       getExamDataById(id);
     }
-  }, []);
+    return () => {
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current);
+      }
+    };
+  }, [id]);
+
   return (
     examData && (
       <div className="mt-2">
@@ -117,7 +138,7 @@ function WriteExam() {
             startTimer={startTimer}
           />
         )}
-        {view === "questions" && questions !== null && (
+        {view === "questions" && questions.length > 0 && (
           <div className="flex flex-col gap-2 mt-2">
             <div className="flex justify-between">
               <h1 className="text-2xl">
@@ -140,10 +161,10 @@ function WriteExam() {
                       }`}
                       key={index}
                       onClick={() => {
-                        setSelectedOptions({
-                          ...selectedOptions,
+                        setSelectedOptions((prevOptions) => ({
+                          ...prevOptions,
                           [selectedQuestionIndex]: option,
-                        });
+                        }));
                         console.log(selectedOptions);
                       }}
                     >
@@ -181,7 +202,7 @@ function WriteExam() {
                 <button
                   className="primary-contained-btn"
                   onClick={() => {
-                    clearInterval(intervalId);
+                    clearInterval(intervalIdRef.current);
                     setTimeUp(true);
                   }}
                 >
@@ -191,7 +212,7 @@ function WriteExam() {
             </div>
           </div>
         )}
-        {view === "result" && (
+        {view === "result" && result && (
           <div className="flex justify-center mt-2 gap-2">
             <div className="flex flex-col gap-2 result">
               <h1 className="text-2xl">Result</h1>
@@ -215,7 +236,7 @@ function WriteExam() {
                       setSelectedQuestionIndex(0);
                       setSelectedOptions({});
                       setTimeUp(false);
-                      setSecondsLeft(examData.duration);
+                      setSecondsLeft(examData.duration * 60);
                     }}
                   >
                     Retake Exam
@@ -260,15 +281,16 @@ function WriteExam() {
                 question.correctOption === selectedOptions[index];
               return (
                 <div
-                  className={`flex flex-col gap-1 p-2 card ${
-                    isCorrect ? "bg-success" : "bg-warning"
-                  }`}
+                  className={`flex flex-col gap-1 ${
+                    isCorrect ? "bg-success" : "bg-error"
+                  } p-2`}
+                  key={index}
                 >
                   <h1 className="text-xl">
                     {index + 1} : {question.name}
                   </h1>
                   <h1 className="text-md">
-                    Submitted Answer : {selectedOptions[index]} :{" "}
+                    Your Answer : {selectedOptions[index]} :{" "}
                     {question.options[selectedOptions[index]]}
                   </h1>
                   <h1 className="text-md">
@@ -286,7 +308,7 @@ function WriteExam() {
                   setSelectedQuestionIndex(0);
                   setSelectedOptions({});
                   setTimeUp(false);
-                  setSecondsLeft(examData.duration);
+                  setSecondsLeft(examData.duration * 60);
                 }}
               >
                 Retake Exam

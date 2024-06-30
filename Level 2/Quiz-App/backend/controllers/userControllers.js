@@ -66,6 +66,7 @@ const login = async (req, res) => {
           message: "User logged in successfully",
           data: token,
           isAdmin: user.isAdmin,
+          _id: user._id,
           success: true,
         });
       } else {
@@ -99,6 +100,7 @@ const getUserInfo = async (req, res) => {
         data: {
           name: user.name,
           isAdmin: user.isAdmin,
+          _id: user._id,
         },
         success: true,
       });
